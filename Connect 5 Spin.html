@@ -269,14 +269,19 @@ async function joinOnlineGame(id) {
 async function updateGame() {
   if (!gameId) return;
   try {
-    await supabase
+    const { data, error } = await supabase
       .from('games')
       .update({
         board: JSON.stringify(board),
         turn: currentPlayer
       })
       .eq('id', gameId);
-  } catch (err) { console.error('updateGame error:', err); }
+
+    if (error) console.error('Error en updateGame:', error);
+    else console.log('updateGame success:', data); // 👈 aquí vemos que se guardó
+  } catch (err) {
+    console.error('updateGame error:', err);
+  }
 }
 
 renderBoard();
