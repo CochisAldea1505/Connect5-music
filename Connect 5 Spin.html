@@ -1,0 +1,294 @@
+
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Conecta 5 Giratorio</title>
+<style>
+  body {background:#0b0f1a;color:#fff;font-family:system-ui, sans-serif;text-align:center;margin:0;padding:20px;}
+  h1 {color:#ff7a18;}
+  #board {display:grid;grid-template-columns:repeat(6,60px);grid-template-rows:repeat(6,60px);gap:4px;justify-content:center;margin:20px auto;position:relative;}
+  .cell {width:60px;height:60px;background:#162132;border-radius:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform .4s ease-in-out;}
+  .cell.player1 {background:#ff7a18;}
+  .cell.player2 {background:#2e8cff;}
+  button {background:#162132;color:#fff;border:none;padding:8px 14px;border-radius:8px;margin:4px;cursor:pointer;font-weight:600;transition:transform .2s;}
+  button:hover {background:#1f2b44;transform:scale(1.05);}
+  #message {margin-top:15px;font-size:18px;}
+  .board-wrapper {position:relative;display:inline-block;}
+  #modeSelect {margin-bottom:10px;}
+  .quadrant-number {position:absolute;font-size:18px;color:#ff7a18;font-weight:700;opacity:0.8;}
+  .q1 {top:-25px;left:-25px;}
+  .q2 {top:-25px;right:-25px;}
+  .q3 {bottom:-25px;left:-25px;}
+  .q4 {bottom:-25px;right:-25px;}
+</style>
+</head>
+<body>
+<h1>Conecta 5 Giratorio</h1>
+<div id="modeSelect">
+  <label>Modo de juego: </label>
+  <button onclick="setMode('player')">Jugador vs Jugador</button>
+  <button onclick="setMode('bot')">Jugador vs Bot 🤖</button>
+</div>
+<div class="board-wrapper">
+  <div id="board"></div>
+  <div class="quadrant-number q1">1</div>
+  <div class="quadrant-number q2">2</div>
+  <div class="quadrant-number q3">3</div>
+  <div class="quadrant-number q4">4</div>
+</div>
+<div id="controls">
+  <span>Jugador actual: <strong id="turn">1 (🟠)</strong></span><br>
+  <button onclick="rotateQuadrant(0,'left')">↶ Cuadrante 1</button>
+  <button onclick="rotateQuadrant(0,'right')">↷ Cuadrante 1</button>
+  <button onclick="rotateQuadrant(1,'left')">↶ Cuadrante 2</button>
+  <button onclick="rotateQuadrant(1,'right')">↷ Cuadrante 2</button><br>
+  <button onclick="rotateQuadrant(2,'left')">↶ Cuadrante 3</button>
+  <button onclick="rotateQuadrant(2,'right')">↷ Cuadrante 3</button>
+  <button onclick="rotateQuadrant(3,'left')">↶ Cuadrante 4</button>
+  <button onclick="rotateQuadrant(3,'right')">↷ Cuadrante 4</button><br>
+  <button onclick="resetGame()">Reiniciar</button>
+</div>
+<div id="message"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  const SUPABASE_URL = "https://grlurmupvdstxeqqnbqm.supabase.co";
+  const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdybHVybXVwdmRzdHhlcXFuYnFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI1NTI2MzUsImV4cCI6MjA3ODEyODYzNX0.wPVySeo6BV6jU79x613j4ZJBKoy17dgv9tdjp0Xp2Cg";
+  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+</script>
+
+<script>
+let board=Array.from({length:6},()=>Array(6).fill(0));
+let currentPlayer=1;
+let mustRotate=false;
+let mode='player';
+const boardEl=document.getElementById('board');
+const messageEl=document.getElementById('message');
+const turnEl=document.getElementById('turn');
+
+function setMode(m){
+  mode=m;
+  resetGame();
+  messageEl.textContent='Modo seleccionado: '+(m==='bot'?'Jugador vs Bot 🤖':'Jugador vs Jugador');
+}
+function renderBoard(){
+  boardEl.innerHTML='';
+  for(let y=0;y<6;y++){
+    for(let x=0;x<6;x++){
+      const cell=document.createElement('div');
+      cell.className='cell';
+      if(board[y][x]===1)cell.classList.add('player1');
+      if(board[y][x]===2)cell.classList.add('player2');
+      cell.onclick=()=>placePiece(x,y);
+      boardEl.appendChild(cell);
+    }
+  }
+}
+function placePiece(x, y) {
+  // Evita poner ficha si no es tu turno
+  if (mustRotate) {
+    messageEl.textContent = 'Debes girar un cuadrante antes de colocar otra ficha!';
+    return;
+  }
+  if (board[y][x] !== 0) return;
+
+  // Si hay modo online y no es tu turno, bloquea
+  if (gameId && currentPlayer !== localPlayer) {
+    messageEl.textContent = 'No es tu turno!';
+    return;
+  }
+
+  board[y][x] = currentPlayer;
+  renderBoard();
+  mustRotate = true;
+  messageEl.textContent = 'Ahora elige un cuadrante para girar.';
+
+  // Si estás en modo online, guarda el cambio en la base
+  if (gameId) updateGame();
+
+  if (gameId) saveGame();
+}
+function rotateQuadrant(q, dir) {
+  if (!mustRotate) {
+    messageEl.textContent = 'Coloca una ficha antes de girar!';
+    return;
+  }
+
+  const startX = (q % 2) * 3;
+  const startY = Math.floor(q / 2) * 3;
+  let sub = Array.from({ length: 3 }, (_, r) => board[startY + r].slice(startX, startX + 3));
+  let rotated = Array.from({ length: 3 }, () => Array(3).fill(0));
+
+  for (let y = 0; y < 3; y++)
+    for (let x = 0; x < 3; x++) {
+      if (dir === 'right') rotated[x][2 - y] = sub[y][x];
+      else rotated[2 - x][y] = sub[y][x];
+    }
+
+  for (let y = 0; y < 3; y++)
+    for (let x = 0; x < 3; x++)
+      board[startY + y][startX + x] = rotated[y][x];
+
+  renderBoard();
+
+  // Verifica victoria
+  if (checkWin(currentPlayer)) {
+    messageEl.textContent = 'Jugador ' + currentPlayer + ' gana!';
+    disableBoard();
+  } else {
+    // Cambia el turno
+    currentPlayer = currentPlayer === 1 ? 2 : 1;
+    mustRotate = false;
+    turnEl.textContent = currentPlayer + (currentPlayer === 1 ? ' (🟠)' : ' (🔵)');
+    messageEl.textContent = 'Coloca una ficha.';
+
+    // Si estás online, sincroniza
+    if (gameId) updateGame();
+  }
+  if (gameId) saveGame();
+}
+function botMove(){
+  let empty=[];
+  for(let y=0;y<6;y++)for(let x=0;x<6;x++)if(board[y][x]===0)empty.push([x,y]);
+  if(empty.length===0)return;
+  const [x,y]=empty[Math.floor(Math.random()*empty.length)];
+  placePiece(x,y);
+  const q=Math.floor(Math.random()*4);
+  const dir=Math.random()<0.5?'left':'right';
+  setTimeout(()=>rotateQuadrant(q,dir),500);
+}
+function disableBoard(){document.querySelectorAll('.cell').forEach(c=>c.onclick=null);}
+function checkWin(player){
+  const inBounds=(x,y)=>x>=0&&y>=0&&x<6&&y<6;
+  const dirs=[[1,0],[0,1],[1,1],[1,-1]];
+  for(let y=0;y<6;y++){
+    for(let x=0;x<6;x++){
+      if(board[y][x]!==player)continue;
+      for(let [dx,dy]of dirs){
+        let count=1;
+        for(let i=1;i<5;i++){
+          let nx=x+dx*i,ny=y+dy*i;
+          if(inBounds(nx,ny)&&board[ny][nx]===player)count++;else break;
+        }
+        if(count>=5)return true;
+      }
+    }
+  }
+  return false;
+}
+function resetGame(){
+  board=Array.from({length:6},()=>Array(6).fill(0));
+  currentPlayer=1;mustRotate=false;
+  messageEl.textContent='';
+  turnEl.textContent='1 (🟠)';
+  renderBoard();
+}
+// 🎵 Catálogo de música aleatoria
+const musicList = [
+  "https://cochisaldea1505.github.io/Connect5-music/1219096_Skydiver.mp3",
+  "https://cochisaldea1505.github.io/Connect5-music/1380325_Lonely.mp3",
+  "https://cochisaldea1505.github.io/Connect5-music/1380443_Rain.mp3",
+  "https://cochisaldea1505.github.io/Connect5-music/503265_Leaving-Leafwood-Forest.mp3"
+];
+
+const audio = new Audio();
+
+function playRandomMusic() {
+  const random = Math.floor(Math.random() * musicList.length);
+  audio.src = musicList[random];
+  audio.volume = 0.5;
+  audio.loop = true;
+  audio.play().catch(err => {
+    console.log("Autoplay bloqueado hasta interacción del jugador:", err);
+  });
+}
+
+// Reproduce música al primer clic
+document.body.addEventListener("click", () => {
+  if (audio.paused) playRandomMusic();
+}, { once: true });
+
+// 🌐 Sincronización online con Supabase
+let gameId = null;
+// variable para saber si este navegador es jugador 1 o 2
+let localPlayer = null;
+
+// Crear o unirse a una partida
+async function startOnlineGame(id) {
+  if (!id) {
+    // Crear nueva partida -> quien crea es jugador 1 (naranja)
+    currentPlayer = 1;
+    localPlayer = 1;
+    const { data, error } = await supabase
+      .from('games')
+      .insert([{ board: JSON.stringify(board), turn: currentPlayer }])
+      .select()
+      .single();
+    if (error) { console.error(error); messageEl.textContent = 'Error al crear partida.'; return; }
+    gameId = data.id;
+    messageEl.textContent = `Partida creada. Código: ${gameId} — espera a tu amigo.`;
+  } else {
+    // Unirse a partida existente -> quien se une es jugador 2 (celeste)
+    gameId = id;
+    localPlayer = 2;
+    const { data, error } = await supabase
+      .from('games')
+      .select('*')
+      .eq('id', id)
+      .single();
+    if (error || !data) { console.error(error); messageEl.textContent = 'No se encontró partida.'; return; }
+    // data.board es string -> parse
+    board = JSON.parse(data.board);
+    currentPlayer = data.turn;
+    messageEl.textContent = `Conectado a partida ${gameId}. Eres jugador 2 (🔵).`;
+    renderBoard();
+  }
+
+  // Suscribirse a cambios en esta partida (realtime)
+  supabase
+    .channel('realtime-games-' + gameId)
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'games', filter: `id=eq.${gameId}` }, payload => {
+      // payload.new.board es string -> parsearlo
+      if (payload && payload.new) {
+        board = JSON.parse(payload.new.board);
+        currentPlayer = Number(payload.new.turn);
+        renderBoard();
+        turnEl.textContent = currentPlayer + (currentPlayer === 1 ? ' (🟠)' : ' (🔵)');
+      }
+    })
+    .subscribe();
+}
+
+// Alternativa para unirse (si quieres separar start/create y join)
+async function joinOnlineGame(id) {
+  return startOnlineGame(id); // reutiliza la misma lógica (localPlayer=2 dentro)
+}
+
+// Actualizar la partida en la DB
+async function updateGame() {
+  if (!gameId) return;
+  try {
+    await supabase
+      .from('games')
+      .update({
+        board: JSON.stringify(board),
+        turn: currentPlayer
+      })
+      .eq('id', gameId);
+  } catch (err) { console.error('updateGame error:', err); }
+}
+
+async function saveGame() {
+  if (!gameId) return;
+  const { data, error } = await supabase
+    .from('games')
+    .update({ board: JSON.stringify(board), turn: currentPlayer })
+    .eq('id', gameId);
+  if (error) console.error('Error al guardar juego:', error);
+}
+
+renderBoard();
+</script>
+</body>
+</html>
