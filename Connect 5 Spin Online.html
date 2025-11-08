@@ -189,12 +189,19 @@ function checkWin(player){
   return false;
 }
 function resetGame(){
-  board=Array.from({length:6},()=>Array(6).fill(0));
-  currentPlayer=1;mustRotate=false;
-  messageEl.textContent='';
-  turnEl.textContent='1 (🟠)';
+  board = Array.from({length:6}, () => Array(6).fill(0));
+  currentPlayer = 1;
+  mustRotate = false;
+  messageEl.textContent = '';
+  turnEl.textContent = '1 (🟠)';
+
+  // 🔹 Añade esto para desconectarte de cualquier juego online
+  gameId = null;
+  localPlayer = null;
+
   renderBoard();
 }
+
 // 🎵 Catálogo de música aleatoria
 const musicList = [
   "https://cochisaldea1505.github.io/Connect5-music/1219096_Skydiver.mp3",
