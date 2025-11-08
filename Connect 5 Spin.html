@@ -242,18 +242,22 @@ async function startOnlineGame(id) {
     messageEl.textContent = `Conectado a partida ${gameId}. Eres jugador 2 (🔵).`;
   }
 
-  // --- Suscribirse a cambios en tiempo real ---
-  supabase
-    .from(`games:id=eq.${gameId}`)
-    .on('UPDATE', payload => {
+  // Suscribirse a cambios en tiempo real (v2)
+const gameChannel = supabase
+  .channel('game-' + gameId)
+  .on(
+    'postgres_changes', 
+    { event: 'UPDATE', schema: 'public', table: 'games', filter: `id=eq.${gameId}` }, 
+    (payload) => {
       if (payload && payload.new) {
         board = JSON.parse(payload.new.board);
         currentPlayer = Number(payload.new.turn);
         renderBoard();
         turnEl.textContent = currentPlayer + (currentPlayer === 1 ? ' (🟠)' : ' (🔵)');
       }
-    })
-    .subscribe();
+    }
+  )
+  .subscribe();
 }
 
 // Alternativa para unirse (si quieres separar start/create y join)
