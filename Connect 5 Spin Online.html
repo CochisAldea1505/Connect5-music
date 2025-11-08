@@ -147,7 +147,6 @@ function rotateQuadrant(q, dir) {
     currentPlayer = currentPlayer === 1 ? 2 : 1;
     mustRotate = false;
     turnEl.textContent = currentPlayer + (currentPlayer === 1 ? ' (🟠)' : ' (🔵)');
-    messageEl.textContent = 'Coloca una ficha';
 
     // Si es tu turno online, avisa
     if (gameId && currentPlayer === localPlayer) {
@@ -294,15 +293,14 @@ document.getElementById('joinGameBtn').addEventListener('click', async () => {
 });
 
 // Actualizar la partida en la DB
-async function updateGame(gameOver = false) {
+async function updateGame() {
   if (!gameId) return;
   try {
     const { data, error } = await supabase
       .from('games')
       .update({
         board: JSON.stringify(board),
-        turn: currentPlayer,
-        winner: gameOver ? currentPlayer : null
+        turn: currentPlayer
       })
       .eq('id', gameId);
 
