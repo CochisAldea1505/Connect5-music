@@ -195,7 +195,12 @@ function resetGame(){
   messageEl.textContent = '';
   turnEl.textContent = '1 (🟠)';
 
-  // 🔹 Añade esto para desconectarte de cualquier juego online
+  // Desconectar de online si estaba
+  if(gameChannel) {
+    supabase.removeChannel(gameChannel);
+    gameChannel = null;
+  }
+  
   gameId = null;
   localPlayer = null;
 
@@ -264,7 +269,7 @@ async function startOnlineGame(id) {
   }
 
   // Suscribirse a cambios en tiempo real (v2)
-  const gameChannel = supabase
+  gameChannel = supabase
   .channel('game-' + gameId)
   .on(
     'postgres_changes', 
