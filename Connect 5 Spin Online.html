@@ -140,14 +140,22 @@ function rotateQuadrant(q, dir) {
   if (checkWin(currentPlayer)) {
     messageEl.textContent = 'Jugador ' + currentPlayer + ' gana!';
     disableBoard();
+
+    if (gameId) updateGame(true);
   } else {
     // Cambia el turno
     currentPlayer = currentPlayer === 1 ? 2 : 1;
     mustRotate = false;
     turnEl.textContent = currentPlayer + (currentPlayer === 1 ? ' (🟠)' : ' (🔵)');
-    messageEl.textContent = 'Coloca una ficha.';
+    messageEl.textContent = 'Coloca una ficha';
 
-    // Si estás online, sincroniza
+    // Si es tu turno online, avisa
+    if (gameId && currentPlayer === localPlayer) {
+      messageEl.textContent = '¡Es tu turno!';
+    } else {
+      messageEl.textContent = 'Coloca una ficha.';
+    }
+
     if (gameId) updateGame();
   }
 }
@@ -286,19 +294,20 @@ document.getElementById('joinGameBtn').addEventListener('click', async () => {
 });
 
 // Actualizar la partida en la DB
-async function updateGame() {
+async function updateGame(gameOver = false) {
   if (!gameId) return;
   try {
     const { data, error } = await supabase
       .from('games')
       .update({
         board: JSON.stringify(board),
-        turn: currentPlayer
+        turn: currentPlayer,
+        winner: gameOver ? currentPlayer : null
       })
       .eq('id', gameId);
 
     if (error) console.error('Error en updateGame:', error);
-    else console.log('updateGame success:', data); // 👈 aquí vemos que se guardó
+    else console.log('updateGame success:', data);
   } catch (err) {
     console.error('updateGame error:', err);
   }
