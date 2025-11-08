@@ -147,13 +147,7 @@ function rotateQuadrant(q, dir) {
     currentPlayer = currentPlayer === 1 ? 2 : 1;
     mustRotate = false;
     turnEl.textContent = currentPlayer + (currentPlayer === 1 ? ' (🟠)' : ' (🔵)');
-
-    // Si es tu turno online, avisa
-    if (gameId && currentPlayer === localPlayer) {
-      messageEl.textContent = '¡Es tu turno!';
-    } else {
-      messageEl.textContent = 'Coloca una ficha.';
-    }
+    messageEl.textContent = 'Coloca una ficha';
 
     if (gameId) updateGame();
   }
