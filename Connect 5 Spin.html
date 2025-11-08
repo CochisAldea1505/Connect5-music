@@ -106,8 +106,6 @@ function placePiece(x, y) {
 
   // Si estás en modo online, guarda el cambio en la base
   if (gameId) updateGame();
-
-  if (gameId) saveGame();
 }
 function rotateQuadrant(q, dir) {
   if (!mustRotate) {
@@ -146,7 +144,6 @@ function rotateQuadrant(q, dir) {
     // Si estás online, sincroniza
     if (gameId) updateGame();
   }
-  if (gameId) saveGame();
 }
 function botMove(){
   let empty=[];
@@ -217,7 +214,7 @@ let localPlayer = null;
 // Crear o unirse a una partida
 async function startOnlineGame(id) {
   if (!id) {
-    // Crear nueva partida -> quien crea es jugador 1 (naranja)
+    // Crear nueva partida -> jugador 1
     currentPlayer = 1;
     localPlayer = 1;
     const { data, error } = await supabase
@@ -229,7 +226,7 @@ async function startOnlineGame(id) {
     gameId = data.id;
     messageEl.textContent = `Partida creada. Código: ${gameId} — espera a tu amigo.`;
   } else {
-    // Unirse a partida existente -> quien se une es jugador 2 (celeste)
+    // Unirse a partida existente -> jugador 2
     gameId = id;
     localPlayer = 2;
     const { data, error } = await supabase
@@ -238,18 +235,17 @@ async function startOnlineGame(id) {
       .eq('id', id)
       .single();
     if (error || !data) { console.error(error); messageEl.textContent = 'No se encontró partida.'; return; }
-    // data.board es string -> parse
     board = JSON.parse(data.board);
     currentPlayer = data.turn;
-    messageEl.textContent = `Conectado a partida ${gameId}. Eres jugador 2 (🔵).`;
     renderBoard();
+    turnEl.textContent = currentPlayer + (currentPlayer === 1 ? ' (🟠)' : ' (🔵)');
+    messageEl.textContent = `Conectado a partida ${gameId}. Eres jugador 2 (🔵).`;
   }
 
-  // Suscribirse a cambios en esta partida (realtime)
+  // --- Suscribirse a cambios en tiempo real ---
   supabase
-    .channel('realtime-games-' + gameId)
-    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'games', filter: `id=eq.${gameId}` }, payload => {
-      // payload.new.board es string -> parsearlo
+    .from(`games:id=eq.${gameId}`)
+    .on('UPDATE', payload => {
       if (payload && payload.new) {
         board = JSON.parse(payload.new.board);
         currentPlayer = Number(payload.new.turn);
@@ -277,15 +273,6 @@ async function updateGame() {
       })
       .eq('id', gameId);
   } catch (err) { console.error('updateGame error:', err); }
-}
-
-async function saveGame() {
-  if (!gameId) return;
-  const { data, error } = await supabase
-    .from('games')
-    .update({ board: JSON.stringify(board), turn: currentPlayer })
-    .eq('id', gameId);
-  if (error) console.error('Error al guardar juego:', error);
 }
 
 renderBoard();
