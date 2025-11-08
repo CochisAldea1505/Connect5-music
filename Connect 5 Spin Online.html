@@ -149,6 +149,10 @@ function rotateQuadrant(q, dir) {
     turnEl.textContent = currentPlayer + (currentPlayer === 1 ? ' (🟠)' : ' (🔵)');
     messageEl.textContent = 'Coloca una ficha';
 
+    if(mode==='bot' && currentPlayer===2){
+        setTimeout(botMove, 500);
+    }
+
     if (gameId) updateGame();
   }
 }
